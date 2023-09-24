@@ -1,0 +1,9 @@
+*.o
+blur
+*.jpg
+
+# dependencies
+stb_image.h
+stb_image_write.h
+print.hpp
+defer.hpp
