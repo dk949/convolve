@@ -1,3 +1,4 @@
+#include "args.hpp"
 #include "defer.hpp"
 #include "print.hpp"
 #include "stb_image.h"
@@ -8,13 +9,10 @@
 #include <cmath>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <tuple>
 
-namespace fs = std::filesystem;
-
-// #define TIMING
-
-enum struct Alg { None, Gauss, Avg };
+#define TIMING
 
 namespace timing {
 namespace chr = std::chrono;
@@ -59,83 +57,43 @@ bool writeImage(fs::path filename, stbi_uc image[], int width, int height, int c
     return false;
 }
 
-fs::path checkExt(char const *filename) {
-    auto const path = fs::path(filename);
-    auto const ext = path.extension();
-    if (ext != ".jpg" && ext != ".tga" && ext != ".bmp" && ext != ".png") {
-        println("Unknown file extension {}", ext.c_str());
-        exit(1);
+// clang-format off
+constexpr double sobelX[][9] = {
+    {
+        1., 0., -1.,
+        2., 0., -2.,
+        1., 0., -1.,
+    },
+    {
+         3., 0.,  -3.,
+        10., 0., -10.,
+         3., 0.,  -3.,
+    },
+    {
+         47., 0.,  -47.,
+        162., 0., -162.,
+         47., 0.,  -47.,
     }
-    return path;
-}
+};
+constexpr double sobelY[][9] = {
+    {
+         1.,  2.,  1.,
+         0.,  0.,  0.,
+        -1., -2., -1.,
+    },
+    {
+         3.,  10.,  3.,
+         0.,   0.,  0.,
+        -3., -10., -3.,
+    },
+    {
+         47.,  162.,  47.,
+         0.,   0.,  0.,
+        -47., -162., -47.,
+    },
+};
 
-auto args(int argc, char **argv) {
-    if (argc < 3) {
-        println(R"(Usage: {} INFILE OUTFILE [OPTS]
-
-        -m|--matsize N      set matrix size, default: 5
-        -s|--sigma N        set sigma, default: 1.4
-        -a|--alg ENUM       pick algorythm, one of gauss, avg or none, default: gauss
-        -c|--channels N     set number of channels to output, default: same as image
-)",
-            fs::path(argv[0]).filename().c_str());
-        exit(1);
-    }
-
-    auto matsize = 5;
-    auto channels = 0;
-    auto sigma = 1.4;
-    auto alg = Alg::Gauss;
-
-    std::string arg;
-    int i;
-    auto const getNext = [&]() -> std::string & {
-        if (argc <= ++i) {
-            println("Expected an argument after {}", arg);
-            exit(1);
-        }
-        arg = argv[i];
-        return arg;
-    };
-    for (i = 3; i < argc; i++) {
-        arg = argv[i];
-        if (arg == "-m" || arg == "--matsize") {
-            matsize = std::stoi(getNext());
-            if (!(matsize % 2)) {
-                println("Matrix size has to be odd");
-                exit(1);
-            }
-        } else if (arg == "-c" || arg == "--channels") {
-            channels = std::stoi(getNext());
-            if (channels < 1) {
-                println("Cannot have fewer than 1 channel");
-                exit(1);
-            }
-            if (channels > 4) {
-                println("Cannot have more than 4 channels");
-                exit(1);
-            }
-        } else if (arg == "-s" || arg == "--sigma") {
-            sigma = std::stod(getNext());
-        } else if (arg == "-a" || arg == "--alg") {
-            auto &next = getNext();
-            std::transform(next.begin(), next.end(), next.begin(), [](auto ch) { return std::tolower(ch); });
-            if (next == "gauss")
-                alg = Alg::Gauss;
-            else if (next == "avg")
-                alg = Alg::Avg;
-            else if (next == "none")
-                alg = Alg::None;
-            else {
-                println("Unknown algorithm {}", arg);
-                exit(1);
-            }
-        } else {
-            println("Unrecognised argument '{}'", arg);
-        }
-    }
-    return std::make_tuple(argv[1], checkExt(argv[2]), matsize, channels, sigma, alg);
-}
+// clang-format on
 
 double G(int x, int y, double sigma) {
     auto const sigma_2 = sigma * sigma;
@@ -159,7 +117,7 @@ double *makeMat(int size, double sigma) {
     return out;
 }
 
-inline constexpr auto reflect(auto x, auto top) {
+inline constexpr auto reflect(auto const &x, auto top) {
     top--;
     if (top < x)
         return top - (x - top);
@@ -167,8 +125,22 @@ inline constexpr auto reflect(auto x, auto top) {
         return std::abs(x);
 }
 
-inline constexpr double convolve(
-    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int height, int matsize, int halfmat) {
+inline constexpr auto threshold(auto x, auto lo, auto hi) {
+    if (x <= lo) return std::numeric_limits<decltype(x)>::min();
+    if (x >= hi) return std::numeric_limits<decltype(x)>::max();
+    return x;
+}
+
+inline constexpr double convolve(double const mat[],
+    const stbi_uc image[],
+    ssize_t x,
+    ssize_t y,
+    int channels,
+    int ch,
+    int width,
+    int height,
+    int matsize,
+    int halfmat) {
     double sum = 0.;
     for (int i = -halfmat, imat = 0; i <= halfmat; i++, imat++)
         for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++) {
@@ -192,7 +164,7 @@ inline constexpr double avg(
 }
 
 int main(int argc, char **argv) {
-    auto const [infile, outfile, matsize, desired_channels, sigma, alg] = args(argc, argv);
+    auto const [infile, outfile, matsize, desired_channels, sobel_type, sigma, th_lo, th_hi, alg] = args(argc, argv);
     auto const halfmat = matsize / 2;
     int width, height, image_channels;
 
@@ -209,6 +181,7 @@ int main(int argc, char **argv) {
     print("input image {}: ({}x{})@{}. Using ", infile, width, height, channels);
     switch (alg) {
         case Alg::Gauss: println("Gausian blur, σ = {}, size = {}.", sigma, matsize); break;
+        case Alg::Sobel: println("Sobel filter, type {}.", sobel_type); break;
         case Alg::Avg: println("averaging."); break;
         case Alg::None: println("nothing."); break;
     }
@@ -226,19 +199,20 @@ int main(int argc, char **argv) {
     for (ssize_t y = 0; y < height; y++) {
         for (ssize_t x = 0; x < width * channels; x += channels) {
             for (int ch = 0; ch < channels; ch++) {
+                auto &px = image_copy[y * width * channels + x + ch];
                 switch (alg) {
                     case Alg::Gauss:
-                        image_copy[y * width * channels + x + ch] =
-                            convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
+                        px = convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
                         break;
-                    case Alg::Avg:
-                        image_copy[y * width * channels + x + ch] =
-                            avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
-                        break;
-                    case Alg::None:
-                        image_copy[y * width * channels + x + ch] = image[y * width * channels + x + ch];
-                        break;
+                    case Alg::Sobel: {
+                        auto const g_x = convolve(sobelX[sobel_type], image, x, y, channels, ch, width, height, 3, 1);
+                        auto const g_y = convolve(sobelY[sobel_type], image, x, y, channels, ch, width, height, 3, 1);
+                        px = std::sqrt(g_x * g_x + g_y * g_y);
+                    } break;
+                    case Alg::Avg: px = avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat); break;
+                    case Alg::None: px = image[y * width * channels + x + ch]; break;
                 }
+                px = threshold(px, th_lo, th_hi);
             }
         }
     }

@@ -1,6 +1,7 @@
 *.o
 blur
 *.jpg
+*.png
 
 # dependencies
 stb_image.h
