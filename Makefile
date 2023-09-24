@@ -11,9 +11,9 @@ LDFLAGS=  $(OMP) $(SAN)
 
 CURL= curl -sLO
 
-all: blur
+all: convolve
 
-blur: $(OBJ)
+convolve: $(OBJ)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 $(OBJ): Makefile $(HDR)
@@ -37,7 +37,7 @@ defer.hpp:
 .PHONY: clean
 clean:
 	rm -f *.o
-	rm -f blur
+	rm -f convolve
 
 .PHONY: clean-deep
 clean-deep: clean
