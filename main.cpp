@@ -1,5 +1,8 @@
+#define PRINT_FILE stderr
+
 #include "args.hpp"
 #include "defer.hpp"
+#include "io.hpp"
 #include "print.hpp"
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -18,42 +21,29 @@ namespace chr = std::chrono;
 static chr::time_point<chr::high_resolution_clock> start_point;
 static chr::time_point<chr::high_resolution_clock> stop_point;
 
-void start() {
+void start() noexcept {
     start_point = chr::high_resolution_clock::now();
 }
 
-void stop() {
+void stop() noexcept {
     stop_point = chr::high_resolution_clock::now();
 }
 
 template<typename Precision = chr::microseconds>
-void report() {
+void report() noexcept {
     auto took = (double)chr::duration_cast<Precision>(stop_point - start_point).count()
               / (double)chr::duration_cast<Precision>(chr::seconds(1)).count();
     println("Took {}s", took);
 }
 #else
-void start() { }
+void start() noexcept { }
 
-void stop() { }
+void stop() noexcept { }
 
 template<typename Precision = chr::microseconds>
-void report() { }
+void report() noexcept { }
 #endif
 }  // namespace timing
-
-bool writeImage(fs::path filename, stbi_uc image[], int width, int height, int channels) {
-    if (auto ex = filename.extension(); ex == ".jpg")
-        return stbi_write_jpg(filename.c_str(), width, height, channels, image, 100);
-    else if (ex == ".tga")
-        return stbi_write_tga(filename.c_str(), width, height, channels, image);
-    else if (ex == ".bmp")
-        return stbi_write_bmp(filename.c_str(), width, height, channels, image);
-    else if (ex == ".png")
-        return stbi_write_png(filename.c_str(), width, height, channels, image, 0);
-
-    return false;
-}
 
 // clang-format off
 constexpr double sobelX[][9] = {
@@ -93,7 +83,7 @@ constexpr double sobelY[][9] = {
 
 // clang-format on
 
-double G(int x, int y, double sigma) {
+double G(int x, int y, double sigma) noexcept {
     auto const sigma_2 = sigma * sigma;
     auto const frac = 1. / (2. * M_PI * sigma_2);
     auto const ex = exp(-(x * x + y * y) / (2. * sigma_2));
@@ -164,17 +154,17 @@ int main(int argc, char **argv) {
     auto const halfmat = matsize / 2;
     int width, height, image_channels;
 
-    auto image = stbi_load(infile, &width, &height, &image_channels, desired_channels);
+    auto image = stbi_load_from_file(infile.fp, &width, &height, &image_channels, desired_channels);
     defer {
         stbi_image_free(image);
     };
     auto const channels = desired_channels ? desired_channels : image_channels;
     if (!image) {
-        println("Could not load image {}: {}", argv[1], stbi_failure_reason());
+        println("Could not load image {}: {}", infile.name, stbi_failure_reason());
         return 1;
     }
 
-    print("input image {}: ({}x{})@{}. Using ", infile, width, height, channels);
+    print("input image {}: ({}x{})@{}. Using ", infile.name[0] == '-' ? "stdin" : infile.name, width, height, channels);
     switch (alg) {
         case Alg::Gauss: println("Gausian blur, σ = {}, size = {}.", sigma, matsize); break;
         case Alg::Sobel: println("Sobel filter, type {}.", sobel_type); break;
@@ -224,7 +214,7 @@ int main(int argc, char **argv) {
     }
     timing::stop();
     if (!writeImage(outfile, image_copy, width, height, channels)) {
-        println("Could not write image to {}", outfile.c_str());
+        println("Could not write image to {}", outfile.name);
         return 1;
     }
     timing::report();

@@ -16,7 +16,7 @@ enum struct Alg { None, Gauss, Sobel, Avg };
         exit(1);              \
     } while (false)
 
-inline fs::path checkExt(char const *filename) {
+inline fs::path checkExt(char const *filename) noexcept {
     auto const path = fs::path(filename);
     auto const ext = path.extension();
     if (ext != ".jpg" && ext != ".tga" && ext != ".bmp" && ext != ".png") DIE("Unknown file extension {}", ext.c_str());
@@ -24,7 +24,7 @@ inline fs::path checkExt(char const *filename) {
     return path;
 }
 
-inline auto args(int argc, char **argv) {
+inline auto args(int argc, char **argv) noexcept {
     auto matsize = 5;
     auto channels = 0;
     auto sigma = 1.4;

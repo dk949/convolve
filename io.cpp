@@ -9,12 +9,12 @@
 #include <cstring>
 #include <filesystem>
 
-void writeCallback(void *context, void *data, int size) {
+void writeCallback(void *context, void *data, int size) noexcept {
     std::FILE *fp = (FILE *)context;
     std::fwrite(data, 1, size, fp);
 }
 
-bool writeImage(File const &file, std::uint8_t image[], int width, int height, int channels) {
+bool writeImage(File const &file, std::uint8_t image[], int width, int height, int channels) noexcept {
     using enum File::Type;
     switch (file.type) {
         case Jpg: return stbi_write_jpg_to_func(writeCallback, file.fp, width, height, channels, image, 100);
@@ -27,11 +27,7 @@ bool writeImage(File const &file, std::uint8_t image[], int width, int height, i
     std::abort();
 }
 
-File File::open(char const *name, File::Mode mode, File::Type type) {
-    static constexpr std::uint8_t bmp_magic[] = {0x42, 0x4d};
-    static constexpr std::uint8_t jpg_magic[] = {0xff, 0xd8, 0xff, 0xe0};
-    static constexpr std::uint8_t png_magic[] = {0x89, 0x50, 0x4e, 0x47};
-
+File File::open(char const *name, File::Mode mode, File::Type type) noexcept {
     using enum File::Mode;
     FILE *const fp = [&] {
         if (name[0] == '-')
@@ -63,8 +59,13 @@ File File::open(char const *name, File::Mode mode, File::Type type) {
                 println("could not read file {}", name);
                 exit(1);
             }
+            // note: can't just rewind, because file may be stdin
             for (int i = 3; i >= 0; i--)
                 std::ungetc(dest[i], fp);
+
+            static constexpr std::uint8_t bmp_magic[] = {0x42, 0x4d};
+            static constexpr std::uint8_t jpg_magic[] = {0xff, 0xd8, 0xff, 0xe0};
+            static constexpr std::uint8_t png_magic[] = {0x89, 0x50, 0x4e, 0x47};
 
             bool is_bmp = true, is_jpg = true, is_png = true;
             for (int i = 0; i < 4; i++) {
@@ -89,7 +90,7 @@ File::File(File &&other) noexcept
     *this = std::move(other);
 }
 
-File::File(char const *name, std::FILE *fp, Type type)
+File::File(char const *name, std::FILE *fp, Type type) noexcept
         : name(name)
         , fp(fp)
         , type(type) { }
@@ -103,6 +104,6 @@ File &File::operator=(File &&other) noexcept {
     return *this;
 }
 
-File::~File() {
+File::~File() noexcept {
     if (fp) std::fclose(fp);
 }
