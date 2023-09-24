@@ -38,16 +38,16 @@ inline auto args(int argc, char **argv) {
         -m|--matsize N      set matrix size, default: {}
         -s|--sigma N        set sigma, default: {}
            --sobel-type N   Sobel filter type (0, 1 or 2), default: {}
-        -t|--threshold N,N  upper and lower threshold values, default: {}, {}
+        -t|--threshold N,N  upper and lower threshold values, default: {},{}
         -a|--alg ENUM       pick algorythm, one of gauss, sobel, avg or none, default: gauss
-        -c|--channels N     set number of channels to output, default: same as image
+        -c|--channels N     set number of channels to output, default: same as input image
 )",
             fs::path(argv[0]).filename().c_str(),
             matsize,
             sigma,
             sobel_type,
-            th_hi,
-            th_lo);
+            th_lo,
+            th_hi);
     }
 
 
