@@ -12,8 +12,6 @@
 #include <limits>
 #include <tuple>
 
-#define TIMING
-
 namespace timing {
 namespace chr = std::chrono;
 #ifdef TIMING
