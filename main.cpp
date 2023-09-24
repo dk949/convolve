@@ -63,31 +63,31 @@ constexpr double sobelX[][9] = {
         1., 0., -1.,
     },
     {
-         3., 0.,  -3.,
-        10., 0., -10.,
-         3., 0.,  -3.,
+        3., 0.,  -3.,
+       10., 0., -10.,
+        3., 0.,  -3.,
     },
     {
-         47., 0.,  -47.,
-        162., 0., -162.,
-         47., 0.,  -47.,
+       47., 0.,  -47.,
+      162., 0., -162.,
+       47., 0.,  -47.,
     }
 };
 constexpr double sobelY[][9] = {
     {
-         1.,  2.,  1.,
-         0.,  0.,  0.,
-        -1., -2., -1.,
+        1.,  2.,  1.,
+        0.,  0.,  0.,
+       -1., -2., -1.,
     },
     {
-         3.,  10.,  3.,
-         0.,   0.,  0.,
-        -3., -10., -3.,
+        3.,  10.,  3.,
+        0.,   0.,  0.,
+       -3., -10., -3.,
     },
     {
-         47.,  162.,  47.,
-         0.,   0.,  0.,
-        -47., -162., -47.,
+       47.,  162.,  47.,
+       0.,   0.,     0.,
+      -47., -162., -47.,
     },
 };
 
@@ -100,7 +100,7 @@ double G(int x, int y, double sigma) {
     return frac * ex;
 }
 
-double *makeMat(int size, double sigma) {
+double *makeGaussMat(int size, double sigma) {
     auto *out = new double[size * size];
     auto const mid = size / 2;
     auto sum = 0.;
@@ -115,6 +115,15 @@ double *makeMat(int size, double sigma) {
     return out;
 }
 
+double *makeAvgMat(int size) {
+    auto const size_2 = size * size;
+    auto *out = new double[size_2];
+    for (int i = 0; i < size_2; i++)
+        out[i] = 1. / (double)size_2;
+
+    return out;
+}
+
 inline constexpr auto reflect(auto const &x, auto top) {
     top--;
     if (top < x)
@@ -123,9 +132,9 @@ inline constexpr auto reflect(auto const &x, auto top) {
         return std::abs(x);
 }
 
-inline constexpr auto threshold(auto x, auto lo, auto hi) {
-    if (x <= lo) return std::numeric_limits<decltype(x)>::min();
-    if (x >= hi) return std::numeric_limits<decltype(x)>::max();
+inline constexpr auto threshold(auto const &x, auto const &lo, auto hi) {
+    if (x <= lo) return std::numeric_limits<std::remove_cvref_t<decltype(x)>>::min();
+    if (x >= hi) return std::numeric_limits<std::remove_cvref_t<decltype(x)>>::max();
     return x;
 }
 
@@ -144,21 +153,10 @@ inline constexpr double convolve(double const mat[],
         for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++) {
             auto const ycoord = reflect(y + j, height);
             auto const xcoord = reflect(x + (i * channels) + ch, width * channels);
-            auto const addr = ycoord * width * channels + xcoord;
-            sum += image[addr] * mat[imat * matsize + jmat];
+            sum += image[ycoord * width * channels + xcoord] * mat[imat * matsize + jmat];
         }
 
     return sum;
-}
-
-inline constexpr double avg(
-    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int height, int matsize, int halfmat) {
-    double sum = 0.;
-    for (int i = -halfmat, imat = 0; i <= halfmat; i++, imat++)
-        for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++)
-            sum += image[reflect(y + j, height) * width * channels + reflect(x + (i * channels), width * channels) + ch];
-
-    return sum / ((double)matsize * (double)matsize);
 }
 
 int main(int argc, char **argv) {
@@ -184,7 +182,16 @@ int main(int argc, char **argv) {
         case Alg::None: println("nothing."); break;
     }
 
-    auto mat = makeMat(matsize, sigma);
+    auto mat = [&] {
+        switch (alg) {
+            case Alg::Gauss: return makeGaussMat(matsize, sigma);
+            case Alg::Avg: return makeAvgMat(matsize);
+            case Alg::Sobel:
+            case Alg::None: break;
+        }
+        return (double *)nullptr;
+    }();
+
     defer {
         delete[] mat;
     };
@@ -200,6 +207,7 @@ int main(int argc, char **argv) {
                 auto &px = image_copy[y * width * channels + x + ch];
                 switch (alg) {
                     case Alg::Gauss:
+                    case Alg::Avg:
                         px = convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
                         break;
                     case Alg::Sobel: {
@@ -207,7 +215,7 @@ int main(int argc, char **argv) {
                         auto const g_y = convolve(sobelY[sobel_type], image, x, y, channels, ch, width, height, 3, 1);
                         px = std::sqrt(g_x * g_x + g_y * g_y);
                     } break;
-                    case Alg::Avg: px = avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat); break;
+                    // case Alg::Avg: px = avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat); break;
                     case Alg::None: px = image[y * width * channels + x + ch]; break;
                 }
                 px = threshold(px, th_lo, th_hi);
