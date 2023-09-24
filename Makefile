@@ -6,7 +6,7 @@ OBJ=$(SRC:.cpp=.o)
 OMP=  -fopenmp
 # TIMING= -DTIMING
 
-CFLAGS= -std=c++20 -O3 $(OMP) $(SAN) $(TIMING)
+CFLAGS= -std=c++20 -O3 $(OMP) $(SAN) $(TIMING) -DSTBI_WRITE_NO_STDIO
 LDFLAGS=  $(OMP) $(SAN)
 
 CURL= curl -sLO

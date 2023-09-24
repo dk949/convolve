@@ -1,6 +1,7 @@
 #ifndef ARGS_HPP
 #define ARGS_HPP
 
+#include "io.hpp"
 #include "print.hpp"
 
 #include <algorithm>
@@ -33,14 +34,23 @@ inline auto args(int argc, char **argv) {
     int th_lo = 0;
 
     if (argc < 3) {
-        DIE(R"(Usage: {} INFILE OUTFILE [OPTS]
+        DIE(R"(Usage: {0} INFILE OUTFILE [OPTS]
 
-        -m|--matsize N      set matrix size, default: {}
-        -s|--sigma N        set sigma, default: {}
-           --sobel-type N   Sobel filter type (0, 1 or 2), default: {}
-        -t|--threshold N,N  upper and lower threshold values, default: {},{}
+        -m|--matsize N      set matrix size, default: {1}
+        -s|--sigma N        set sigma, default: {2}
+           --sobel-type N   Sobel filter type (0, 1 or 2), default: {3}
+        -t|--threshold N,N  upper and lower threshold values, default: {4},{5}
         -a|--alg ENUM       pick algorythm, one of gauss, sobel, avg or none, default: gauss
         -c|--channels N     set number of channels to output, default: same as input image
+
+
+        note that - (dash) can be used insted of INFILE or OUTFILE to use stdin and stdout respectively
+
+        -.extension can be used to force a particular input or output format. E.g:
+            {0} -.jpg -.png -a none # convert image from jpg to png
+
+        if no extension is specified, input format is obtained from file signature
+        and output format is the same as input format
 )",
             fs::path(argv[0]).filename().c_str(),
             matsize,
@@ -112,8 +122,10 @@ inline auto args(int argc, char **argv) {
             DIE("{} is out of range: {}", arg, e.what());
         }
     }
-    return std::make_tuple(argv[1],
-        checkExt(argv[2]),
+    auto input_file = File::open(argv[1], File::Mode::Read);
+    auto outout_file = File::open(argv[2], File::Mode::Write, input_file.type);
+    return std::make_tuple(std::move(input_file),
+        std::move(outout_file),
         matsize,
         channels,
         sobel_type,
