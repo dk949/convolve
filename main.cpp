@@ -159,22 +159,34 @@ double *makeMat(int size, double sigma) {
     return out;
 }
 
-inline constexpr double gauss(
-    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int matsize, int halfmat) {
+inline constexpr auto reflect(auto x, auto top) {
+    top--;
+    if (top < x)
+        return top - (x - top);
+    else
+        return std::abs(x);
+}
+
+inline constexpr double convolve(
+    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int height, int matsize, int halfmat) {
     double sum = 0.;
     for (int i = -halfmat, imat = 0; i <= halfmat; i++, imat++)
-        for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++)
-            sum += image[(y + j) * width * channels + (x + (i * channels)) + ch] * mat[imat * matsize + jmat];
+        for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++) {
+            auto const ycoord = reflect(y + j, height);
+            auto const xcoord = reflect(x + (i * channels) + ch, width * channels);
+            auto const addr = ycoord * width * channels + xcoord;
+            sum += image[addr] * mat[imat * matsize + jmat];
+        }
 
     return sum;
 }
 
 inline constexpr double avg(
-    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int matsize, int halfmat) {
+    double mat[], stbi_uc image[], ssize_t x, ssize_t y, int channels, int ch, int width, int height, int matsize, int halfmat) {
     double sum = 0.;
     for (int i = -halfmat, imat = 0; i <= halfmat; i++, imat++)
         for (int j = -halfmat, jmat = 0; j <= halfmat; j++, jmat++)
-            sum += image[(y + j) * width * channels + (x + (i * channels)) + ch];
+            sum += image[reflect(y + j, height) * width * channels + reflect(x + (i * channels), width * channels) + ch];
 
     return sum / ((double)matsize * (double)matsize);
 }
@@ -211,17 +223,17 @@ int main(int argc, char **argv) {
     };
     timing::start();
 #pragma omp parallel for
-    for (ssize_t y = halfmat; y < height - halfmat; y++) {
-        for (ssize_t x = halfmat * channels; x < (width - halfmat) * channels; x += channels) {
+    for (ssize_t y = 0; y < height; y++) {
+        for (ssize_t x = 0; x < width * channels; x += channels) {
             for (int ch = 0; ch < channels; ch++) {
                 switch (alg) {
                     case Alg::Gauss:
                         image_copy[y * width * channels + x + ch] =
-                            gauss(mat, image, x, y, channels, ch, width, matsize, halfmat);
+                            convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
                         break;
                     case Alg::Avg:
                         image_copy[y * width * channels + x + ch] =
-                            avg(mat, image, x, y, channels, ch, width, matsize, halfmat);
+                            avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
                         break;
                     case Alg::None:
                         image_copy[y * width * channels + x + ch] = image[y * width * channels + x + ch];

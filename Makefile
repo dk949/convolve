@@ -2,11 +2,11 @@ SRC=$(wildcard *.cpp)
 HDR=$(wildcard *.hpp) stb_image_write.h stb_image.h print.hpp defer.hpp
 OBJ=$(SRC:.cpp=.o)
 
-# SAN = -fsanitize=address
+# SAN = -g -lg -Og -fsanitize=address
 OMP =  -fopenmp
 
-CFLAGS= -std=c++20 $(SAN) -O3 $(OMP)
-LDFLAGS= $(SAN) $(OMP)
+CFLAGS= -std=c++20 -O3 $(OMP) $(SAN)
+LDFLAGS=  $(OMP) $(SAN)
 
 all: blur
 
