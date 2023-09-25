@@ -23,3 +23,9 @@ You will need:
 ```sh
 make -j
 ```
+
+Set the `TIMING` variable to a non empty string to enable timing
+
+```sh
+TIMING=1 make -j
+```
