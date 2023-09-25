@@ -1,6 +1,6 @@
 #include "io.hpp"
-#define PRINT_FILE stderr
 
+#define PRINT_FILE stderr
 #include "print.hpp"
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -8,6 +8,11 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+
+#ifdef __unix__
+#    include <sys/ioctl.h>
+#    include <unistd.h>
+#endif
 
 void writeCallback(void *context, void *data, int size) noexcept {
     std::FILE *fp = static_cast<FILE *>(context);
@@ -106,4 +111,18 @@ File &File::operator=(File &&other) noexcept {
 
 File::~File() noexcept {
     if (fp) std::fclose(fp);
+}
+
+std::pair<size_t, size_t> getTermWH() {
+    static constexpr auto fallback = std::make_pair(150, 40);
+#ifdef __unix__
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    // If this is part of a pipe line, the size of the terminal may be 0
+    if (!w.ws_col || !w.ws_row) return fallback;
+    return std::make_pair(w.ws_col, w.ws_row);
+#else
+    // Sensible (?) defaults
+    return fallback;
+#endif
 }

@@ -8,7 +8,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-enum struct Alg { None, Gauss, Sobel, Avg };
+enum struct Alg { None, Gauss, Sobel, Custom, Avg };
 
 #define DIE(...)              \
     do {                      \
@@ -29,28 +29,57 @@ inline auto args(int argc, char **argv) noexcept {
     auto channels = 0;
     auto sigma = 1.4;
     auto sobel_type = 0;
-    auto alg = Alg::Gauss;
+    auto alg = Alg::None;
     int th_hi = 255;
     int th_lo = 0;
+    char const *custom_mat = nullptr;
 
     if (argc < 3) {
         DIE(R"(Usage: {0} INFILE OUTFILE [OPTS]
 
-        -m|--matsize N      set matrix size, default: {1}
-        -s|--sigma N        set sigma, default: {2}
-           --sobel-type N   Sobel filter type (0, 1 or 2), default: {3}
-        -t|--threshold N,N  upper and lower threshold values, default: {4},{5}
-        -a|--alg ENUM       pick algorythm, one of gauss, sobel, avg or none, default: gauss
-        -c|--channels N     set number of channels to output, default: same as input image
+         b defg ijkl nopqr  u wxyz
+
+        -m|--matsize N              set matrix size, default: {1}
+        -s|--sigma N                set sigma, default: {2}
+           --sobel-type N           Sobel filter type (0, 1 or 2), default: {3}
+        -t|--threshold N,N          upper and lower threshold values, default: {4},{5}
+        -x|--custom-matrix MAT      specify the matrix to use use with custom algorythm, default: none
+        -a|--alg ENUM               pick algorythm, one of gauss, sobel, avg, custom or none, default: none
+        -c|--channels N             set number of channels to output, default: same as input image
 
 
-        note that - (dash) can be used insted of INFILE or OUTFILE to use stdin and stdout respectively
+        note that a dash (-) can be used insted of INFILE or OUTFILE to use stdin and stdout respectively
 
         -.extension can be used to force a particular input or output format. E.g:
             {0} -.jpg -.png -a none # convert image from jpg to png
 
         if no extension is specified, input format is obtained from file signature
         and output format is the same as input format
+
+
+        the following format can be used to specify a custom matrix:
+            cells are separated by commas (,)
+            rows are separated by bars (|)
+            cells may only be numbers (integer or floating point)
+            the matrix has to be a squear with odd side length
+            if the matrix is not normalised, it will be normalised
+        E.g:
+            0.1,0.2,0.3|0,0,0|-0.1,-0.2,-0.3
+            represents the matrix:
+            ┌               ┐
+            │ 0.1  0.2  0.3 │
+            │   0    0    0 │
+            │-0.1 -0.2 -0.3 │
+            └               ┘
+
+            1,2,3|4,5,6|7,8,9
+            represents:
+            ┌                  ┐
+            │0.022 0.044 0.067 │
+            │0.089 0.111 0.133 │
+            │0.156 0.178   0.2 │
+            └                  ┘
+
 )",
             fs::path(argv[0]).filename().c_str(),
             matsize,
@@ -99,6 +128,9 @@ inline auto args(int argc, char **argv) noexcept {
 
             } else if (arg == "-s" || arg == "--sigma") {
                 sigma = std::stod(getNext());
+            } else if (arg == "-x" || arg == "--custom-matrix") {
+                getNext();
+                custom_mat = argv[i];
             } else if (arg == "-a" || arg == "--alg") {
                 auto &next = getNext();
                 std::transform(next.begin(), next.end(), next.begin(), [](auto ch) { return std::tolower(ch); });
@@ -106,22 +138,28 @@ inline auto args(int argc, char **argv) noexcept {
                     alg = Alg::Gauss;
                 else if (next == "sobel")
                     alg = Alg::Sobel;
+                else if (next == "custom")
+                    alg = Alg::Custom;
                 else if (next == "avg")
                     alg = Alg::Avg;
                 else if (next == "none")
                     alg = Alg::None;
                 else
                     DIE("Unknown algorithm {}", arg);
-
             } else
                 DIE("Unrecognised argument '{}'", arg);
-
         } catch (std::invalid_argument const &e) {
             DIE("Invalid number '{}': {}", arg, e.what());
         } catch (std::out_of_range const &e) {
             DIE("{} is out of range: {}", arg, e.what());
         }
     }
+    if (custom_mat) {
+        std::string_view sv = custom_mat;
+        matsize = int(std::count(sv.begin(), sv.end(), '|') + !sv.ends_with('|'));
+    }
+    if (alg == Alg::Custom && !custom_mat) DIE("custom algorythm requires specifying a matrix");
+
     auto input_file = File::open(argv[1], File::Mode::Read);
     auto outout_file = File::open(argv[2], File::Mode::Write, input_file.type);
     return std::make_tuple(std::move(input_file),
@@ -132,6 +170,7 @@ inline auto args(int argc, char **argv) noexcept {
         sigma,
         std::uint8_t(th_lo),
         std::uint8_t(th_hi),
+        custom_mat,
         alg);
 }
 

@@ -7,6 +7,7 @@ Builtin filters:
 
 * Gaussian blur
 * Sobel
+* Custom matrix
 * Averaging
 
 Can do various other things such as applying a threshold and converting between

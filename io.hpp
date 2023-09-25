@@ -2,6 +2,7 @@
 #define WRITER_HPP
 #include <cstdint>
 #include <cstdio>
+#include <utility>
 
 struct File {
     enum struct Type { Invalid, Jpg, Png, Tga, Bmp };
@@ -21,6 +22,10 @@ private:
 };
 
 bool writeImage(File const &file, std::uint8_t image[], int width, int height, int channels) noexcept;
+
+
+
+std::pair<size_t, size_t> getTermWH();
 
 
 #endif  // WRITER_HPP
