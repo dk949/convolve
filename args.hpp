@@ -37,8 +37,6 @@ inline auto args(int argc, char **argv) noexcept {
     if (argc < 3) {
         DIE(R"(Usage: {0} INFILE OUTFILE [OPTS]
 
-         b defg ijkl nopqr  u wxyz
-
         -m|--matsize N              set matrix size, default: {1}
         -s|--sigma N                set sigma, default: {2}
            --sobel-type N           Sobel filter type (0, 1 or 2), default: {3}
