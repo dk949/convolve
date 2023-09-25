@@ -10,8 +10,8 @@
 #include <filesystem>
 
 void writeCallback(void *context, void *data, int size) noexcept {
-    std::FILE *fp = (FILE *)context;
-    std::fwrite(data, 1, size, fp);
+    std::FILE *fp = static_cast<FILE *>(context);
+    std::fwrite(data, 1, size_t(size), fp);
 }
 
 bool writeImage(File const &file, std::uint8_t image[], int width, int height, int channels) noexcept {

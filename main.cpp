@@ -31,8 +31,8 @@ void stop() noexcept {
 
 template<typename Precision = chr::microseconds>
 void report() noexcept {
-    auto took = (double)chr::duration_cast<Precision>(stop_point - start_point).count()
-              / (double)chr::duration_cast<Precision>(chr::seconds(1)).count();
+    auto took = double(chr::duration_cast<Precision>(stop_point - start_point).count())
+              / double(chr::duration_cast<Precision>(chr::seconds(1)).count());
     println("Took {}s", took);
 }
 #else
@@ -91,7 +91,8 @@ double G(int x, int y, double sigma) noexcept {
 }
 
 double *makeGaussMat(int size, double sigma) {
-    auto *out = new double[size * size];
+    auto const size_2 = size_t(size * size);
+    auto *out = new double[size_2];
     auto const mid = size / 2;
     auto sum = 0.;
     for (int i = 0; i < size; i++)
@@ -99,17 +100,17 @@ double *makeGaussMat(int size, double sigma) {
             out[j * size + i] = G(i - mid, j - mid, sigma);
             sum += out[j * size + i];
         }
-    for (int i = 0; i < size * size; i++)
+    for (size_t i = 0; i < size_2; i++)
         out[i] /= sum;
 
     return out;
 }
 
 double *makeAvgMat(int size) {
-    auto const size_2 = size * size;
+    auto const size_2 = size_t(size * size);
     auto *out = new double[size_2];
-    for (int i = 0; i < size_2; i++)
-        out[i] = 1. / (double)size_2;
+    for (size_t i = 0; i < size_2; i++)
+        out[i] = 1. / double(size_2);
 
     return out;
 }
@@ -179,13 +180,13 @@ int main(int argc, char **argv) {
             case Alg::Sobel:
             case Alg::None: break;
         }
-        return (double *)nullptr;
+        return static_cast<double *>(nullptr);
     }();
 
     defer {
         delete[] mat;
     };
-    auto image_copy = new stbi_uc[width * height * channels];
+    auto image_copy = new stbi_uc[size_t(width * height * channels)];
     defer {
         delete[] image_copy;
     };
@@ -198,12 +199,12 @@ int main(int argc, char **argv) {
                 switch (alg) {
                     case Alg::Gauss:
                     case Alg::Avg:
-                        px = convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat);
+                        px = stbi_uc(convolve(mat, image, x, y, channels, ch, width, height, matsize, halfmat));
                         break;
                     case Alg::Sobel: {
                         auto const g_x = convolve(sobelX[sobel_type], image, x, y, channels, ch, width, height, 3, 1);
                         auto const g_y = convolve(sobelY[sobel_type], image, x, y, channels, ch, width, height, 3, 1);
-                        px = std::sqrt(g_x * g_x + g_y * g_y);
+                        px = stbi_uc(std::sqrt(g_x * g_x + g_y * g_y));
                     } break;
                     // case Alg::Avg: px = avg(mat, image, x, y, channels, ch, width, height, matsize, halfmat); break;
                     case Alg::None: px = image[y * width * channels + x + ch]; break;

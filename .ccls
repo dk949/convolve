@@ -4,3 +4,10 @@ clang
 %hpp c++-header
 %c -std=c11
 %cpp -std=c++20
+
+-Wall
+-Wextra
+-Wpedantic
+-Wconversion
+-Werror
+-Wold-style-cast

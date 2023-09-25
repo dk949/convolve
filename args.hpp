@@ -130,8 +130,8 @@ inline auto args(int argc, char **argv) noexcept {
         channels,
         sobel_type,
         sigma,
-        (std::uint8_t)th_lo,
-        (std::uint8_t)th_hi,
+        std::uint8_t(th_lo),
+        std::uint8_t(th_hi),
         alg);
 }
 
